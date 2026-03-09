@@ -171,7 +171,7 @@ function Index() {
   };
 
   const downloadTicket = (ticket) => {
-    const imgData = "logo.png";
+    const imgData = "logo.PNG";
     const doc = new jsPDF();
     let row = 10;
     let width = 130;
@@ -381,7 +381,7 @@ function Index() {
     const totalRemained = totalCost - totalPaid;
 
     // Prepare doc header
-    const imgData = "logo.png";
+    const imgData = "logo.PNG";
     const doc = new jsPDF();
     let row = 10;
     doc.addImage(imgData, "PNG", 10, 10, 80, 40);
