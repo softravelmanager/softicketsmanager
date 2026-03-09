@@ -704,7 +704,7 @@ async function uploadTravelPort(files) {
         office: agencyCode,
         agentCost: 0,
         ticketNumber: p[2],
-        paymentMethod: content.match(/A11([A-Z]{1,2})/)?.[1] || "",
+        paymentMethod: "",//content.match(/A11([A-Z]{1,2})/)?.[1] || "",
         paidAmount: parseFloat(content.match(/A11[A-Z\s]+([\d.]+)/)?.[1] || content.match(/A0701[A-Z]{3}\s+[\d.]+[A-Z]{3}\s+([\d.]+)/)?.[1] || 0),
         receivingAmount1: 0,
         receivingAmount1Date: "", 
