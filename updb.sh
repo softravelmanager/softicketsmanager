@@ -26,7 +26,7 @@ run_export() {
 
 case "$ACTION" in
   im)
-    if [[ "$MONGO_URI" == *"y2d"* ]]; then
+    if [[ "$MONGO_URI" == *"ncl"* ]]; then
       echo "The provided URI appears to be a staging database. Aborting import operation for safety."
       exit 1
     fi
@@ -36,7 +36,7 @@ case "$ACTION" in
     run_export
     ;;
   an)
-    if [[ "$MONGO_URI" == *"y2d"* ]]; then
+    if [[ "$MONGO_URI" == *"ncl"* ]]; then
       echo "The provided URI appears to be a staging database. Aborting anonymize operation for safety."
       exit 1
     fi
