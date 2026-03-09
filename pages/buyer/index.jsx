@@ -183,7 +183,7 @@ export default function AgentTransfersPage() {
       });
 
       //console.log(operations, opPdf);
-      const imgData = "logo.png";
+      const imgData = "logo.PNG";
       const doc = new jsPDF();
       let row = 10;
 

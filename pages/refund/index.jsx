@@ -106,7 +106,7 @@ export default function RefundsPage() {
 
   const downloadRefund = (refund) => {
     // Use the same jsPDF logic as the tickets page (adapt for refund fields)
-    const imgData = "logo.png";
+    const imgData = "logo.PNG";
     const doc = new jsPDF();
     let row = 10;
     let width = 130;

@@ -415,8 +415,9 @@ function Index() {
     // Table
     const headers = [["Name", "Booking Date", "PNR", "Ticket N.", "Agent Cost", "Fully Paid"]];
     const body = tickets.map(t => {
+      console.log(t);
       const costStr = t.receivingAmountT || '';
-      const paidStr = t.agentCost || '';
+      const paidStr = t.agent !== '' ? t.agentCost : t.paidAmount;
       const costN = parseFloat(String(costStr).replace(/[^\d.-]/g, '')) || 0;
       const paidN = parseFloat(String(paidStr).replace(/[^\d.-]/g, '')) || 0;
       const remained = costN - paidN;
