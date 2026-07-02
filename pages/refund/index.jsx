@@ -40,7 +40,7 @@ export default function RefundsPage() {
     if (globalSearch && searchField !== "all") {
       filtered = filtered.filter(ref => (ref[searchField] || "").toString().toLowerCase().includes(globalSearch.toLowerCase()));
     } else if (globalSearch && searchField === "all") {
-      filtered = filtered.filter(ref => ["name", "supplied", "refund", "refundDate", "refundUsed", "penality", "returned", "returnedDate", "bookingCode", "ticketNumber", "bookedOn"]
+      filtered = filtered.filter(ref => ["name", "payer", "supplied", "refund", "refundDate", "refundUsed", "penality", "returned", "returnedDate", "bookingCode", "ticketNumber", "bookedOn"]
         .some(field => (ref[field] || "").toString().toLowerCase().includes(globalSearch.toLowerCase())));
     }
     setRefunds(filtered);
@@ -111,7 +111,7 @@ export default function RefundsPage() {
     let row = 10;
     let width = 130;
     let length = 35;
-    doc.addImage(imgData, "PNG", 10, 10, 80, 40);
+    doc.addImage(imgData, "PNG", 10, 10, 40, 40);
     doc.setFontSize(20);
     row += 10;
     doc.text("SOF Travel", 200, row, null, null, "right");
@@ -131,17 +131,17 @@ export default function RefundsPage() {
     row += 20;
     doc.text("Nome Passeggero", 10, row); doc.text(":", 60, row); doc.text(refund.name, 65, row, { maxWidth: width }, null, "left");
     refund.name && refund.name.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row); row += 10;
+    doc.line(10, row, 200, row); row += 7;
     doc.text("PNR", 10, row); doc.text(":", 60, row); doc.text(refund.bookingCode, 65, row, { maxWidth: width }, null, "left");
-    doc.line(10, row, 200, row); row += 10;
+    doc.line(10, row, 200, row); row += 7;
     doc.text("Ticket", 10, row); doc.text(":", 60, row); doc.text(refund.ticketNumber, 65, row, { maxWidth: width }, null, "left");
-    doc.line(10, row, 200, row); row += 10;
+    doc.line(10, row, 200, row); row += 7;
     doc.text("Refund", 10, row); doc.text(":", 60, row); doc.text(refund.refund, 65, row, { maxWidth: width }, null, "left");
-    doc.line(10, row, 200, row); row += 10;
+    doc.line(10, row, 200, row); row += 7;
     doc.text("Refund Date", 10, row); doc.text(":", 60, row); doc.text(refund.refundDate, 65, row, { maxWidth: width }, null, "left");
-    doc.line(10, row, 200, row); row += 10;
-    doc.text("Refund Used", 10, row); doc.text(":", 60, row); doc.text(refund.refundUsed, 65, row, { maxWidth: width }, null, "left");
-    doc.line(10, row, 200, row); row += 10;
+    doc.line(10, row, 200, row); row += 7;
+    doc.text("Refund Used", 10, row); doc.text(":", 60, row); doc.text((refund?.refundUsed || ''), 65, row, { maxWidth: width }, null, "left");
+    doc.line(10, row, 200, row); row += 7;
     doc.text("Penalty", 10, row); doc.text(":", 60, row); doc.text(refund.penality, 65, row, { maxWidth: width }, null, "left");
     doc.line(10, row, 200, row);
      // Footer
@@ -341,6 +341,7 @@ export default function RefundsPage() {
           {refund && (
             <Table><TableBody>
               <TableRow><TableCell>Passenger:</TableCell><TableCell>{refund.name}</TableCell></TableRow>
+              <TableRow><TableCell>Payer:</TableCell><TableCell>{refund.payer}</TableCell></TableRow>
               <TableRow><TableCell>Supplied To:</TableCell><TableCell>{refund.supplied}</TableCell></TableRow>
               <TableRow><TableCell>Refund:</TableCell><TableCell>{refund.refund}</TableCell></TableRow>
               <TableRow><TableCell>Refund Date:</TableCell><TableCell>{refund.refundDate}</TableCell></TableRow>

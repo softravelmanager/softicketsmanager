@@ -19,6 +19,7 @@ export default function SuppliersTransfersPage() {
   const [totals, setTotals] = useState({ supplied: 0, refund: 0, total: 0 });
   const [opExcel, setOpExcel] = useState([]);
   const [dates, setDates] = useState({ start: "", end: "", type: "transferDate" });
+  const [supplierFilter, setSupplierFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deleteGroupKey, setDeleteGroupKey] = useState(null);
@@ -36,7 +37,7 @@ export default function SuppliersTransfersPage() {
     let transfer = operations[deleteGroupKey];
     transfer.map((op) => {
       let isRefund = op.operation.includes("Used");
-      let isB2B = op.operation.includes("B2B");
+      let isB2B = op.operation.includes("B2B") || op.operation.includes("SOF");
       let ticketRefundUsed = isRefund ? parseFloat(op.ticketRefundUsedN) : null;
       let suppliedTicket = isB2B ? parseFloat(op.suppliedTicketN) : null;
       let supplied = op.ticket[0].supplied ? parseFloat(op.ticket[0].supplied) : null;
@@ -68,13 +69,18 @@ export default function SuppliersTransfersPage() {
       setDates({ start, end, type });
     }
     operationsService.getAll({ start, end, type }).then((res) => {
-      const operationsI = res.reduce((group, arr) => {
+      const filtered = res.filter((op) => {
+        if (!supplierFilter) return true;
+        return op.operation && op.operation.toUpperCase().includes(supplierFilter.toUpperCase());
+      });
+
+      const operationsI = filtered.reduce((group, arr) => {
         const { transferName } = arr;
         group[transferName] = group[transferName] ?? [];
         group[transferName].push(arr);
         return group;
       }, {});
-      setOpExcel(res);
+      setOpExcel(filtered);
       setOperations(operationsI);
       let transferAmountTotalOperationI = 0;
       let refundAmountTotalOperationI = 0;
@@ -141,11 +147,13 @@ export default function SuppliersTransfersPage() {
   const FilterBar = (
     <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'end', width: '100%' }}>
-        <Box sx={{ minWidth: 120 }}>
+        <Box sx={{ minWidth: 160 }}>
           <FormControl size="small" fullWidth>
-            <InputLabel id="type-label">Type</InputLabel>
-            <Select labelId="type-label" id="type" value={dates.type || "transferDate"} onChange={e => setDates(d => ({ ...d, type: e.target.value }))} label="Type">
-              <MenuItem value="transferDate">Transfer Date</MenuItem>
+            <InputLabel id="supplier-label">Supplier</InputLabel>
+            <Select labelId="supplier-label" id="supplier-filter" value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} label="Supplier">
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="B2B">B2B</MenuItem>
+              <MenuItem value="SOF">SOF</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -180,7 +188,21 @@ export default function SuppliersTransfersPage() {
       )}
       {!loading && operations && Object.keys(operations).length > 0 && (
         <Box sx={{ width: '100%', mb: 2 }}>
-          {Object.keys(operations).map((key, i) => (
+          {Object.keys(operations).map((key, i) => {
+            const group = operations[key];
+            const groupSuppliers = Array.from(new Set(group.map((op) => {
+              const iata = op.ticket?.[0]?.iata;
+              if (iata) return iata;
+              const text = op.operation?.toUpperCase() || "";
+              const hasSof = text.includes("SOF");
+              const hasB2B = text.includes("B2B");
+              if (hasSof && hasB2B) return "B2B/SOF";
+              if (hasSof) return "SOF";
+              if (hasB2B) return "B2B";
+              return "Unknown";
+            })));
+            const supplierLabel = groupSuppliers.length === 1 ? groupSuppliers[0] : groupSuppliers.length > 1 ? "Mixed" : "Unknown";
+            return (
             <Accordion 
             key={key} 
             sx={{ 
@@ -192,11 +214,11 @@ export default function SuppliersTransfersPage() {
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>                 
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
-                  <Typography sx={{ fontWeight: 600, mr: 2 }}>{i+1} - Bonifico</Typography>
-                  <Typography sx={{ mr: 2 }}>Date: {operations[key][0].transferDate}</Typography>
-                  <Typography sx={{ mr: 2 }}>Total: {operations[key][0].totalOperation}</Typography>
-                  <Typography sx={{ mr: 2 }}>Supplied: {operations[key][0].transferAmountTotalOperation}</Typography>
-                  <Typography sx={{ mr: 2 }}>Refund: {operations[key][0].refundAmountTotalOperation}</Typography>
+                  <Typography sx={{ fontWeight: 600, mr: 2 }}>{i+1} - Bonifico {supplierLabel}</Typography>
+                  <Typography sx={{ mr: 2 }}>Date: {group[0].transferDate}</Typography>
+                  <Typography sx={{ mr: 2 }}>Total: {group[0].totalOperation}</Typography>
+                  <Typography sx={{ mr: 2 }}>Supplied: {group[0].transferAmountTotalOperation}</Typography>
+                  <Typography sx={{ mr: 2 }}>Refund: {group[0].refundAmountTotalOperation}</Typography>
                   <span
                     tabIndex={0}
                     style={{ cursor: 'pointer', marginLeft: 8, display: 'inline-flex' }}
@@ -247,7 +269,8 @@ export default function SuppliersTransfersPage() {
                 </Box>
               </AccordionDetails>
             </Accordion>
-          ))}
+            );
+          })}
         </Box>
       )}
       <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>

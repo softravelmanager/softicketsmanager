@@ -27,7 +27,7 @@ async function importBackups() {
       const raw = EJSON.parse(fileContent); // Use EJSON parser instead of JSON.parse
       const docs = Array.isArray(raw) ? raw : raw.documents;
       console.log(`Importing ${file} into collection ${collectionName}...`);
-      if (!Array.isArray(docs)) {
+      if (!Array.isArray(docs) || docs.length === 0) {
         console.error(`${file} does not contain an array, skipping. Content:`, JSON.stringify(raw).slice(0, 200));
         continue;
       }

@@ -47,7 +47,7 @@ export function Nav() {
     "expenses/categories": "Expenses Categories",
     "expenses/add": "Add Expense",
     "expenses/edit": "Edit Expense",
-    flights: "Next Flights/Events",
+    flights: "Next 7 days Flights",
   };
   
    const config = getConfig();

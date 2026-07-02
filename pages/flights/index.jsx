@@ -69,7 +69,7 @@ export default function NextFlightsPage() {
                 <Typography sx={{ textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{ticket.dates}</Typography>
               </Stack>
               <Stack direction="row" spacing={1}>
-                <Tooltip title="Info"><IconButton onClick={() => infoTicket(ticket)}><InfoIcon /></IconButton></Tooltip>
+                <Tooltip title="Info"><IconButton color={!ticket.amountsCompleted ? 'error' : 'success'} onClick={() => infoTicket(ticket)}><InfoIcon /></IconButton></Tooltip>
                 {ticket.isFlight && (
                   <Tooltip title="Check In"><IconButton onClick={() => checkin(ticket)} color="primary"><FlightTakeoffIcon /></IconButton></Tooltip>
                 )}
@@ -106,10 +106,12 @@ export default function NextFlightsPage() {
           {ticket && (
             <Table><TableBody>
               <TableRow><TableCell>Passenger:</TableCell><TableCell>{ticket.name}</TableCell></TableRow>
+              <TableRow><TableCell>Payer:</TableCell><TableCell>{ticket.payer}</TableCell></TableRow>
               <TableRow><TableCell>Agent:</TableCell><TableCell>{ticket.agent}</TableCell></TableRow>
               <TableRow><TableCell>PNR:</TableCell><TableCell>{ticket.bookingCode}</TableCell></TableRow>
               <TableRow><TableCell>Ticket:</TableCell><TableCell>{ticket.ticketNumber}</TableCell></TableRow>
               <TableRow><TableCell>Cost:</TableCell><TableCell>{ticket.paidAmount}</TableCell></TableRow>
+              <TableRow><TableCell>Customer Cost:</TableCell><TableCell>{ticket.customerCost}</TableCell></TableRow>
               <TableRow><TableCell>Receiving Amount 1:</TableCell><TableCell>{ticket.receivingAmount1}</TableCell></TableRow>
               <TableRow><TableCell>Receiving Date 1:</TableCell><TableCell>{ticket.receivingAmount1Date}</TableCell></TableRow>
               <TableRow><TableCell>Payment Method:</TableCell><TableCell>{ticket.paymentMethod}</TableCell></TableRow>

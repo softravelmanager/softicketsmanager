@@ -5,6 +5,7 @@ export const fetchWrapper = {
   post: request("POST"),
   put: request("PUT"),
   delete: request("DELETE"),
+  getBinary: requestBinary("GET"),
 };
 
 function request(method) {
@@ -18,6 +19,31 @@ function request(method) {
       requestOptions.body = JSON.stringify(body);
     }
     return fetch(url, requestOptions).then(handleResponse);
+  };
+}
+
+function requestBinary(method) {
+  return async (url) => {
+    const requestOptions = {
+      method,
+      headers: authHeader(url),
+    };
+    const response = await fetch(url, requestOptions);
+    if (!response.ok) {
+      const contentType = response.headers?.get("content-type") || "";
+      let data = null;
+      if (contentType.includes("application/json")) {
+        data = await response.json().catch(() => null);
+      } else {
+        data = await response.text().catch(() => null);
+      }
+      if ([401, 403].includes(response.status) && userService.userValue) {
+        userService.logout();
+      }
+      const error = (data && data.message) || response.statusText;
+      return Promise.reject(error);
+    }
+    return await response.blob();
   };
 }
 

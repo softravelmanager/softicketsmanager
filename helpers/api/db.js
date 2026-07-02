@@ -51,10 +51,12 @@ function ticketsModel() {
     {
       fileName: { type: String, required: false },
       name: { type: String, required: false },
+      payer: { type: String, required: false },
       bookingCode: { type: String, required: false },
       agent: { type: String, required: false },
       agentId: { type: mongoose.Schema.ObjectId, required: false },
       agentCost: { type: String, required: false },
+      customerCost: { type: String, required: false },
       paidByAgent: { type: String, required: false },
       iata: { type: String, required: false },
       ticketNumber: { type: String, required: false },

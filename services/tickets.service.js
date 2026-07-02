@@ -4,6 +4,7 @@ import { cleanFlight, formatDate } from "./index";
 const baseUrl = `/api/tickets`;
 const usersUrl = "/api/users";
 const airlinesUrl = "/api/flights";
+const backupUrl = "/api/backup";
 const months = [
   "Jan",
   "Feb",
@@ -32,9 +33,11 @@ export const ticketsService = {
   getTicketsByAgent,
   getFlights,
   getBookings,
+  downloadBackup,
   uploadAirArabia,
   uploadWizzAir,
   uploadFlixbus,
+  uploadEmirates,
   uploadTravelPort,
 };
 
@@ -57,7 +60,7 @@ async function getFlights() {
     let isFlight = !!url;
     flights.push({ ...r, url, isFlight });
   });
-  let tickets = getAll({}, flights);
+  let tickets = await getAll({}, flights);
   return tickets;
 }
 
@@ -90,6 +93,7 @@ async function getAll(filters, flights = []) {
         (parseFloat(t.receivingAmount3) || 0)
       : 0;
     let profit = parseFloat((tra - tk2).toFixed(2));
+    let daSaldare = parseFloat((tk2 - tra).toFixed(2));
     let methods =
       t.paymentMethod +
       (t.receivingAmount2Method ? " - " + t.receivingAmount2Method : "") +
@@ -115,6 +119,7 @@ async function getAll(filters, flights = []) {
       idP: i + 1,
       receivingAmountT: "€ " + tra.toFixed(2),
       paidAmount: "€ " + t.paidAmount,
+      customerCost: t.customerCost !== undefined ? "€ " + parseFloat(t.customerCost || 0).toFixed(2) : "",
       agent,
       agentCost: t.agentCost && agent ? "€ " + t.agentCost : "",
       methods: methods,
@@ -129,6 +134,7 @@ async function getAll(filters, flights = []) {
       paidByAgent: t.paidByAgent ? "€ " + t.paidByAgent : t.paidByAgent,
       penality: penality !== "" ? "€ " + parseFloat(penality).toFixed(2) : "",
       amountsCompleted: amountsCompleted,
+      daSaldare: "€ " + daSaldare.toFixed(2), // Format daSaldare here
     };
   });
   return tickets;
@@ -162,6 +168,10 @@ async function getRefundsForSupply(filters = {}) {
 async function getBookings() {
   const tickets = await fetchWrapper.get(baseUrl + '/profit');
   return tickets;
+}
+
+async function downloadBackup() {
+  return await fetchWrapper.getBinary(backupUrl);
 }
 
 async function getProfit(filters) {
@@ -216,16 +226,18 @@ async function getProfit(filters) {
       totalReceivingAmount1 + totalReceivingAmount2 + totalReceivingAmount3;
 
     let paidAmount = parseFloat(ticket.paidAmount);
+    let customerCost = parseFloat(ticket.customerCost) || 0;
     let profit = totalReceivingAmount - paidAmount;
     let bookings = 1;
 
     if (ticketsP[key] !== undefined) {
       ticketsP[key].totalReceivingAmount += totalReceivingAmount;
       ticketsP[key].paidAmount += paidAmount;
+      ticketsP[key].customerCost += customerCost;
       ticketsP[key].profit += profit;
       ticketsP[key].bookings += 1;
     } else {
-      ticketsP[key] = { totalReceivingAmount, paidAmount, profit, bookings };
+      ticketsP[key] = { totalReceivingAmount, paidAmount, customerCost, profit, bookings };
     }
 
     if (
@@ -553,6 +565,7 @@ async function upload(files) {
     n.map((ntp, i) => {
       let tkt = {
         name: ntp,
+        payer: "",
         bookingCode: c2,
         agent: agl.hasOwnProperty(ag) ? agl[ag] : ag,
         agentId: agl.hasOwnProperty(ag)
@@ -561,6 +574,7 @@ async function upload(files) {
         iata: iac.hasOwnProperty(ia) ? iac[ia] : ia,
         office: iac.hasOwnProperty(ofi) ? iac[ofi] : ofi,
         agentCost: ac !== "" ? ac : 0,
+        customerCost: 0,
         ticketNumber: t.length ? t[i] : tc,
         paymentMethod: mt,
         paidAmount: tk2,
@@ -841,6 +855,7 @@ async function uploadAirArabia(files) {
 
             const tkt = {
                 name: passengerName,
+                payer: "",
                 bookingCode: bookingCode,
                 agent: agl.hasOwnProperty(agentCode) ? agl[agentCode] : '',
                 agentId: agl.hasOwnProperty(agentCode)
@@ -849,6 +864,7 @@ async function uploadAirArabia(files) {
                 iata: 'AIR ARABIA MAROC',
                 office: '', // Not available in this format
                 agentCost: 0, // Not available in this format
+                customerCost: 0,
                 ticketNumber: ticketNumber,
                 paymentMethod: '',
                 paidAmount: paidAmount,
@@ -937,12 +953,14 @@ async function uploadWizzAir(files) {
 
         const tkt = {
           name: passengerName,
+          payer: "",
           bookingCode: bookingCode,
           agent: '',
           agentId: agl.hasOwnProperty(agent) ? agl[agent] : agency || admin || "123456789012345678901234",
           iata: 'WIZZAIR',
           office: '',
           agentCost: 0,
+          customerCost: 0,
           ticketNumber: `${bookingCode}-${passengerIndex + 1}`, // Make ticket number unique per passenger
           paymentMethod: '',
           paidAmount: paidAmount,
@@ -1039,12 +1057,14 @@ async function uploadFlixbus(files) {
 
             const tkt = {
                 name: formattedName,
+                payer: "",
                 bookingCode: bookingCode,
                 agent: '',
                 agentId: agency || admin || "123456789012345678901234", // Default to agency or admin
                 iata: 'FLIXBUS',
                 office: '',
                 agentCost: 0,
+                customerCost: 0,
                 ticketNumber: `${bookingCode}-${allTickets.length + 1}`, // Unique ticket number
                 paymentMethod: '',
                 paidAmount: paidAmount,
@@ -1077,4 +1097,146 @@ async function uploadFlixbus(files) {
     }
 
     return allTickets;
+}
+
+async function uploadEmirates(files) {
+  const users = await fetchWrapper.get(usersUrl);
+  let agl = {};
+  let admin = "";
+  let agency = "";
+  users.forEach((userT) => {
+    let nameT = `${userT.firstName} ${userT.lastName}`;
+    if (userT.level === "admin") admin = userT.id;
+    if (nameT.toLowerCase().includes("agency")) agency = userT.id;
+    agl[userT.code] = userT.id;
+  });
+
+  const allTickets = [];
+
+  for (const fileContent of files) {
+    try {
+      // Parse XML - Extract root attributes
+      const recordLocatorMatch = fileContent.match(/RecordLocator="([^"]+)"/);
+      const ticketNumberMatch = fileContent.match(/TicketNumber="([^"]+)"/);
+      const bookingCode = recordLocatorMatch ? recordLocatorMatch[1] : '';
+      const ticketNumber = ticketNumberMatch ? ticketNumberMatch[1] : '';
+
+      // Extract creation date
+      const creationDateMatch = fileContent.match(/<CreationDate[^>]*>(\d{4}-\d{2}-\d{2})<\/CreationDate>/);
+      const bookedOn = creationDateMatch ? formatDate(new Date(creationDateMatch[1])) : formatDate(new Date());
+
+      // Extract phone number
+      const phoneMatch = fileContent.match(/<TelephoneNumber>([^<]+)<\/TelephoneNumber>/);
+      const phone = phoneMatch ? phoneMatch[1].replace(/\D/g, '').slice(-10) : '';
+
+      // Extract traveler name (first occurrence in Traveler element)
+      const travelerMatch = fileContent.match(/<Traveler[^>]*>[\s\S]*?<TravelerName>[\s\S]*?<Surname>([^<]+)<\/Surname>[\s\S]*?<GivenName>([^<]+)<\/GivenName>/);
+      const surname = travelerMatch ? travelerMatch[1].trim() : '';
+      const givenName = travelerMatch ? travelerMatch[2].trim() : '';
+      const passengerName = `${surname} ${givenName}`.trim();
+
+      // Extract flight information from Itinerary
+      const flightMatches = fileContent.match(/<Flight[^>]*>[\s\S]*?<\/Flight>/g) || [];
+      const flights = [];
+
+      for (const flightMatch of flightMatches) {
+        const airlineMatch = flightMatch.match(/<AirlineCode>([^<]+)<\/AirlineCode>/);
+        const flightNumMatch = flightMatch.match(/<FlightNumber>([^<]+)<\/FlightNumber>/);
+        const departureBlock = flightMatch.match(/<Departure>([\s\S]*?)<\/Departure>/);
+        const arrivalBlock = flightMatch.match(/<Arrival>([\s\S]*?)<\/Arrival>/);
+
+        if (airlineMatch && flightNumMatch && departureBlock && arrivalBlock) {
+          const depAirport = departureBlock[1].match(/<AirportName>([^<]+)<\/AirportName>/);
+          const depDate = departureBlock[1].match(/<Date>(\d{4}-\d{2}-\d{2})<\/Date>/);
+          const arrAirport = arrivalBlock[1].match(/<AirportName>([^<]+)<\/AirportName>/);
+          const arrDate = arrivalBlock[1].match(/<Date>(\d{4}-\d{2}-\d{2})<\/Date>/);
+
+          if (depAirport && depDate && arrAirport && arrDate) {
+            flights.push({
+              airline: airlineMatch[1],
+              number: flightNumMatch[1],
+              depAirport: depAirport[1],
+              depDate: depDate[1],
+              arrAirport: arrAirport[1],
+              arrDate: arrDate[1]
+            });
+          }
+        }
+      }
+
+      // Format flight information
+      let travel1 = '';
+      let travel2 = '';
+      let dates = '';
+
+      if (flights.length > 0) {
+        travel1 = `${flights[0].depAirport}/${flights[0].arrAirport}`;
+        const depDateFormatted = new Date(flights[0].depDate);
+        dates = `${depDateFormatted.getDate().toString().padStart(2, '0')}/${(depDateFormatted.getMonth() + 1).toString().padStart(2, '0')}/${depDateFormatted.getFullYear()}`;
+
+        if (flights.length > 1) {
+          travel2 = `${flights[1].depAirport}/${flights[1].arrAirport}`;
+        }
+      }
+
+      // Extract total price from FareGroup (not nested Price, to get total for all travelers)
+      const fareGroupMatch = fileContent.match(/<FareGroup[^>]*TotalPrice="([^"]+)"/);
+      const totalPrice = fareGroupMatch ? parseFloat(fareGroupMatch[1]) / 100 : 0; // Assuming price is in cents
+
+      // Extract airline code from first flight, fallback to EK
+      const airlineCode = flights.length > 0 ? flights[0].airline : 'EK';
+      
+      // Extract airline name from XML if available
+      const airlineNameMatch = fileContent.match(/<AirlineName>([^<]+)<\/AirlineName>/);
+      const airlineName = airlineNameMatch ? airlineNameMatch[1].trim() : airlineCode;
+      let iac = { 38200562: "B2B", 38287561: "SOF" };
+
+      // Build ticket object
+      const tkt = {
+        name: passengerName,
+        payer: "",
+        bookingCode: bookingCode,
+        agent: '',
+        agentId: agency || admin || "123456789012345678901234",
+        iata: iac[38288331],
+        office: '',
+        agentCost: 0,
+        customerCost: 0,
+        ticketNumber: ticketNumber,
+        paymentMethod: '',
+        paidAmount: totalPrice,
+        receivingAmount1: 0,
+        receivingAmount1Date: '',
+        receivingAmount2Date: '',
+        receivingAmount2Method: "",
+        receivingAmount3Date: '',
+        receivingAmount3Method: "",
+        receivingAmount2: 0,
+        receivingAmount3: 0,
+        cardNumber: '',
+        isVoid: false,
+        bookedOn: bookedOn,
+        travel1: travel1,
+        travel2: travel2,
+        dates: dates,
+        phone: phone,
+        flight: airlineName,
+        refund: "",
+        refundDate: "",
+        desc: "",
+        supplied: 0,
+        returned: 0,
+        returnedDate: "",
+        paidByAgent: 0,
+      };
+
+      if (passengerName) {
+        allTickets.push(tkt);
+      }
+    } catch (error) {
+      console.error('Error processing Emirates XML file:', error);
+    }
+  }
+
+  return allTickets;
 }

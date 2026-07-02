@@ -17,6 +17,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import moment from "moment";
 export default Index;
 
 function Index() {
@@ -27,7 +28,7 @@ function Index() {
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(false);
   const [dates, setDates] = useState({ start: "", end: "", type: "" });
-  const [totals, setTotals] = useState([0, 0, 0, 0]);
+  const [totals, setTotals] = useState([0, 0, 0, 0, 0]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [searchFields, setSearchFields] = useState(["all"]);
@@ -37,6 +38,7 @@ function Index() {
   const [exportOpen, setExportOpen] = useState(false);
   const [availableFields, setAvailableFields] = useState([]);
   const [selectedFields, setSelectedFields] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   useEffect(() => {
     getTickets();
@@ -51,7 +53,7 @@ function Index() {
     }
     // Multi-field search
     if (globalSearch) {
-      let fields = searchFields.includes("all") ? ["name", "agent", "bookingCode", "ticketNumber", "iata", "phone", "methods"] : searchFields;
+      let fields = searchFields.includes("all") ? ["name", "payer", "agent", "bookingCode", "ticketNumber", "iata", "phone", "methods", "desc", "cardNumber"] : searchFields;
       filtered = filtered.filter(ticket =>
         fields.some(field => (ticket[field] || "").toString().toLowerCase().includes(globalSearch.toLowerCase()))
       );
@@ -63,7 +65,7 @@ function Index() {
         let aValue = a[sortConfig.key];
         let bValue = b[sortConfig.key];
 
-        if (['profit', 'paidAmount', 'receivingAmountT', 'agentCost'].includes(sortConfig.key)) {
+        if (['profit', 'paidAmount', 'customerCost', 'receivingAmountT', 'agentCost'].includes(sortConfig.key)) {
             aValue = parseFloat(String(aValue || '0').replace(/[^\d.-]/g, ''));
             bValue = parseFloat(String(bValue || '0').replace(/[^\d.-]/g, ''));
         } else if (sortConfig.key === 'bookedOn') {
@@ -89,8 +91,8 @@ function Index() {
   }, [notPaidOnly, globalSearch, searchFields, apiTickets, sortConfig]);
 
   const PRIORITY_FIELDS = [
-    'name', 'bookingCode', 'ticketNumber', 'bookedOn', 'iata',
-    'profit', 'paidAmount', 'receivingAmountT', 'methods', 'paymentMethod',
+    'name', 'payer', 'bookingCode', 'ticketNumber', 'bookedOn', 'iata',
+    'profit', 'paidAmount', 'customerCost', 'receivingAmountT', 'methods', 'paymentMethod',
     'phone', 'agent', 'agentCost',
     'receivingAmount1', 'receivingAmount1Date',
     'receivingAmount2', 'receivingAmount2Date',
@@ -170,144 +172,215 @@ function Index() {
     setDeleteTicketDialog(true);
   };
 
-  const downloadTicket = (ticket) => {
-    const imgData = "logo.PNG";
-    const doc = new jsPDF();
-    let row = 10;
-    let width = 130;
-    let length = 35;
+  const toggleSelectTicket = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id]
+    );
+  };
+
+  const drawTicketReceipt = (doc, tickets) => {
+    const ticketList = Array.isArray(tickets) ? tickets : [tickets];
+    const firstTicket = ticketList[0];
+    const imgData = "logo.png";
+    const imgData1 = "iata2.jpg";
+
+    // 1. Logo (Centered as per image)
     doc.addImage(imgData, "PNG", 10, 10, 80, 40);
+    doc.addImage(imgData1, "PNG", 110, 20, 40, 10);
 
-    doc.setFontSize(20);
-    row += 10;
-    doc.text("Sof Travel", 200, row, null, null, "right");
-    doc.setFontSize(10);
-    row += 10;
-    doc.text("Piazza Guglielmo Marconi 3/D", 200, row, null, null, "right");
-    row += 5;
-    doc.text("42121 - Reggio Emilia", 200, row, null, null, "right");
-    row += 5;
-    doc.text("Tel/fax: +39 0522 434392", 200, row, null, null, "right");
-    row += 5;
-    doc.text("Cell.: +39 334 3532384, +39 351 1220012", 200, row, null, null, "right");
-    row += 10;
-    doc.setDrawColor(120, 120, 120);
-    doc.line(10, row, 200, row);
-    doc.setFontSize(14);
-    row += 20;
+    // 2. Bolla Header (Left)
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    const lastValidPaymentDate = firstTicket.receivingAmount3Date?.trim() || firstTicket.receivingAmount2Date?.trim() || firstTicket.receivingAmount1Date?.trim();
+    const headerPaymentDate = lastValidPaymentDate || moment().format('DD/MM/YYYY');
+    doc.text(`Ricevuta di pagamento del ${headerPaymentDate}`, 15, 60);
+    doc.setFont("helvetica", "normal");
+    
+    doc.setFontSize(9);
+    doc.text(`Operatore: SOF Travel`, 15, 67);
+    doc.text(`Nr. Biglietti: ${ticketList.length}`, 15, 72);
+    doc.text(`Data stampa: ${moment().format('DD/MM/YYYY')}`, 15, 77);
 
-    doc.text("Nome Passeggero", 10, row);
-    doc.text(":", 60, row);
-    doc.text(ticket.name, 65, row, { maxWidth: width }, null, "left");
-    ticket.name.length > length ? (row += 10) : (row += 4);
+    // 3. Passenger Spett.le Box (Right)
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(110, 50, 85, 30, 3, 3);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "italic");
+    doc.text("Spett.le", 115, 56);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(firstTicket.payer?.trim() || firstTicket.name, 115, 63, { maxWidth: 75 });
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("Contatto: " + (firstTicket.phone || 'N/A'), 115, 72);
 
-    doc.line(10, row, 200, row);
-    row += 7;
-    doc.text("Data Acquisto", 10, row);
-    doc.text(":", 60, row);
-    doc.text(ticket.bookedOn, 65, row, { maxWidth: width }, null, "left");
-    ticket.bookedOn.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
+    // 4. Header Labels Bar
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(15, 90, 180, 15, 2, 2, 'FD');
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.text("Prenotato il", 18, 96);
+    doc.text("Numero", 40, 96);
+    doc.text("PNR", 75, 96);
+    doc.text("Compagnia", 105, 96);
+    doc.text("Passeggero", 135, 96);
 
-    doc.text("Codice prenotazione", 10, row);
-    doc.text(":", 60, row);
-    doc.text(ticket.bookingCode, 65, row, { maxWidth: width }, null, "left");
-    ticket.bookingCode.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
+    // 5. Main Content Row Container
+    doc.roundedRect(15, 110, 180, 100, 3, 3);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    
+    // List Passengers
+    let currentY = 118;
+    ticketList.slice(0, 5).forEach((t) => {
+      doc.text(t.bookedOn, 18, currentY);
+      doc.text(t.ticketNumber || 'N/A', 40, currentY, { maxWidth: 33 });
+      doc.text(t.bookingCode || 'N/A', 75, currentY, { maxWidth: 28 });
+      doc.text(t.flight || 'N/A', 105, currentY, { maxWidth: 28 });
+      doc.text(t.name, 135, currentY, { maxWidth: 58 });
+      currentY += 6;
+    });
 
-    doc.text("Date Viaggio", 10, row);
-    doc.text(":", 60, row);
-    doc.text(ticket.dates, 65, row, { maxWidth: width }, null, "left");
-    ticket.dates && ticket.dates.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
+    // Dettagli Viaggio
+    currentY = 150;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Dettagli Viaggio:", 18, currentY);    
+    doc.setFont("helvetica", "normal");
+    currentY += 5;
+    
+    ticketList.forEach(t => {
+      if (currentY > 180) return;
+      doc.text(`${t.name.split(' ')[0]}: ${t.travel1 || 'N/A'} ${t.travel2 ? ' || ' + t.travel2 : ''}`, 18, currentY, { maxWidth: 170 });
+      currentY += 7;
+    });
 
-    doc.text("Porto di partenza", 10, row);
-    doc.text(":", 60, row);
-    doc.text(ticket.travel1, 65, row, { maxWidth: width }, null, "left");
-    ticket.travel1 && ticket.travel1.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
+    // Payment Details Section
+    currentY = 182;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("Dettagli Pagamento:", 18, currentY);
+    currentY += 5;
+    doc.setFont("helvetica", "normal");
 
-    doc.text("Porto di arrivo", 10, row);
-    doc.text(":", 60, row);
-    doc.text(ticket.travel2, 65, row, { maxWidth: width }, null, "left");
-    ticket.travel2 && ticket.travel2.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
+    let totalPaymentsNumeric = 0;
+    let totalCostNumeric = 0;
 
-    doc.text("Numero del biglietto", 10, row);
-    doc.text(":", 60, row);
-    doc.text(ticket.ticketNumber, 65, row, { maxWidth: width }, null, "left");
-    ticket.ticketNumber && ticket.ticketNumber.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
+    ticketList.forEach(t => {
+      const p1 = parseFloat(t.receivingAmount1 || '0') || 0;
+      const p2 = parseFloat(t.receivingAmount2 || '0') || 0;
+      const p3 = parseFloat(t.receivingAmount3 || '0') || 0;
+      
+      let payments = [];
+      if (p1 > 0) payments.push(`€ ${p1.toFixed(2)} (${t.receivingAmount1Date}) - ${t.paymentMethod}`);
+      if (p2 > 0) payments.push(`€ ${p2.toFixed(2)} (${t.receivingAmount2Date}) - ${t.receivingAmount2Method}`);
+      if (p3 > 0) payments.push(`€ ${p3.toFixed(2)} (${t.receivingAmount3Date}) - ${t.receivingAmount3Method}`);
 
-    doc.text("Pagato", 10, row);
-    doc.text(":", 60, row);
-    let total =
-      parseFloat(
-        (parseFloat(ticket.receivingAmount1) || 0) +
-          (parseFloat(ticket.receivingAmount2) || 0) +
-          (parseFloat(ticket.receivingAmount3) || 0)
-      ).toFixed(2) + " EUR";
-    doc.text(total, 65, row, { maxWidth: width }, null, "left");
-    total.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
+      if (payments.length > 0 && currentY < 210) {
+        const paymentStr = `${t.name.split(' ')[0]}: ${payments.join(' || ')}`;
+        doc.text(paymentStr, 18, currentY, { maxWidth: 170 });
+        const lines = doc.splitTextToSize(paymentStr, 170);
+        currentY += (lines.length * 4);
+      }
+      totalPaymentsNumeric += (p1 + p2 + p3);
+      
+      if (t.customerCost && t.customerCost.trim()) {
+        totalCostNumeric += parseFloat(String(t.customerCost || '0').replace(/[^\d.-]/g, '')) || 0;
+      }
+    });
 
-    doc.text("Metodo di pagamento", 10, row);
-    doc.text(":", 60, row);
-    let methods =
-      ticket.paymentMethod +
-      (ticket.receivingAmount2Method
-        ? " - " + ticket.receivingAmount2Method
-        : "") +
-      (ticket.receivingAmount3Method
-        ? " - " + ticket.receivingAmount3Method
-        : "");
-    doc.text(methods, 65, row, { maxWidth: width }, null, "left");
-    methods.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
-
-    doc.text("Volo/Nave", 10, row);
-    doc.text(":", 60, row);
-    doc.text(ticket.flight, 65, row, { maxWidth: width }, null, "left");
-    ticket.flight && ticket.flight.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
-
-    doc.text("Numero di telefono", 10, row);
-    doc.text(":", 60, row);
-    doc.text(ticket.phone, 65, row, { maxWidth: width }, null, "left");
-    ticket.phone && ticket.phone.length > length ? (row += 10) : (row += 4);
-    doc.line(10, row, 200, row);
-    row += 7;
-
-    if (ticket.refund) {
-      doc.text("Rimborso", 10, row);
-      doc.text(":", 60, row);
-      let refund =
-        ticket.refund +
-        " EUR" +
-        (ticket.refundDate ? " - " + formatDate(ticket.refundDate, "IT") : "");
-      doc.text(refund, 65, row, { maxWidth: width }, null, "left");
-      refund.length > length ? (row += 10) : (row += 4);
-      doc.line(10, row, 200, row);
-      row += 7;
+    if (totalCostNumeric === 0) {
+      totalCostNumeric = totalPaymentsNumeric;
     }
 
-    row = 280;
+    const daSaldareNumeric = totalCostNumeric - totalPaymentsNumeric;
+
+    // 6. Totals Grid & Signature
+    const startTotalsY = 215;
+    doc.roundedRect(15, startTotalsY, 180, 50, 3, 3);
+    
+    // Vertical separators for totals
+    doc.line(55, startTotalsY, 55, startTotalsY + 15);
+    doc.line(95, startTotalsY, 95, startTotalsY + 15);
+    doc.line(135, startTotalsY, 135, startTotalsY + 15);
+    doc.line(165, startTotalsY, 165, startTotalsY + 15);
+
+    // Labels for totals
     doc.setFontSize(8);
-    doc.text("SOF Travel", 200, row, null, null, "right");
-    row += 2;
-    doc.line(10, row, 200, row);
-    row += 3;
-    doc.text("Piazza Guglielmo Marconi 3/D, 42121 Reggio Emilia, Italia", 200, row, null, null, "right");
-    doc.save(ticket.name.replace(/\W/g, "_") + "_" + ticket.id + ".pdf");
+    doc.text("Tot. Importo", 18, startTotalsY + 5);
+    doc.text("", 58, startTotalsY + 5);
+    doc.text("", 138, startTotalsY + 5);
+    doc.text("Da Saldare", 168, startTotalsY + 5);
+
+    // Values for totals
+    doc.setFontSize(10);
+    doc.text(`€ ${totalCostNumeric.toFixed(2)}`, 40, startTotalsY + 12, null, null, "right");
+    doc.text('', 80, startTotalsY + 12, null, null, "right");
+    doc.text(``, 160, startTotalsY + 12, null, null, "right"); // Tot. Pagato
+    doc.text(`€ ${daSaldareNumeric.toFixed(2)}`, 190, startTotalsY + 12, null, null, "right"); // Da Saldare
+
+    // Net amount prominent line
+    doc.line(15, startTotalsY + 15, 195, startTotalsY + 15);
+    doc.setFont("helvetica", "bold");
+    doc.text("Tot. Saldato", 145, startTotalsY + 22);
+    doc.text(`€ ${totalPaymentsNumeric.toFixed(2)}`, 190, startTotalsY + 22, null, null, "right");
+    doc.setFont("helvetica", "normal");
+
+    // Signature area
+    doc.line(140, startTotalsY + 15, 140, startTotalsY + 50);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.text("Firma", 165, startTotalsY + 47, null, null, "center");
+
+    // 7. Company Footer
+    doc.setFontSize(8);
+    //doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont("helvetica", "bold");
+    
+    const footerLine1 = "Piazza Guglielmo Marconi 3/D, 42121 Reggio Emilia, Italia";
+    const footerLine2 = "Tel/fax: +39 0522 434392 - Cell.: +39 334 3532384, +39 351 1220012";
+    const footerLine3 = "P. IVA 02241890223 - softravel.it - softravel786@gmail.com";
+
+    doc.text(footerLine1, 105, 280, null, null, "center");
+    doc.text(footerLine2, 105, 285, null, null, "center");
+    doc.text(footerLine3, 105, 290, null, null, "center");
+    // Disclaimer: not valid for fiscal/tax purposes
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.text("* Questa ricevuta non è valida ai fini fiscali.", 205, 295, null, null, "right");
+  };
+
+  const downloadTicket = (ticket) => {
+    const doc = new jsPDF();
+    drawTicketReceipt(doc, [ticket]);
+    doc.save(`${ticket.name.replace(/\W/g, "_")}_Ticket_${ticket.id}.pdf`);
+  };
+
+  const downloadSelectedTickets = () => {
+    const selectedData = apiTickets.filter(t => selectedIds.includes(t.id));
+    if (selectedData.length === 0) return;
+
+    const doc = new jsPDF();
+    drawTicketReceipt(doc, selectedData);
+    doc.save(`Tickets_Summary_${moment().format('YYYYMMDD_HHmm')}.pdf`);
+  };
+
+  const downloadBackup = async () => {
+    try {
+      const blob = await ticketsService.downloadBackup();
+      const fileName = `backup_${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      window.alert(error.message || 'Unable to download backup.');
+    }
   };
 
   const hideDeleteTicketDialog = () => {
@@ -327,31 +400,39 @@ function Index() {
     let tc = 0;
     let tr = 0;
     let ta = 0;
+    let tcc = 0;
     for (let i = 0; i < data.length; i++) {
       let ttp = data[i].profit.replace("€ ", "");
       let ttc = data[i].paidAmount.replace("€ ", "");
       let ttr = data[i].receivingAmountT.replace("€ ", "");
       let tta = data[i].agentCost ? data[i].agentCost.replace("€ ", "") : 0;
+      let tcccc = data[i].customerCost ? data[i].customerCost.replace("€ ", "") : 0;
       tp += parseFloat(ttp);
       tc += parseFloat(ttc);
       tr += parseFloat(ttr);
       ta += parseFloat(tta);
+      tcc += parseFloat(tcccc);
     }
     setTotals([
       "€ " + tp.toFixed(2),
       "€ " + tc.toFixed(2),
       "€ " + tr.toFixed(2),
       "€ " + ta.toFixed(2),
+      "€ " + tcc.toFixed(2),
     ]);
   };
 
   // Export CSV using selected fields (if any) or all fields by default
   const exportCSV = () => {
-    if (!tickets.length) return;
-    const fields = selectedFields.length ? selectedFields : Array.from(new Set(tickets.flatMap(t => Object.keys(t || {}))));
+    const dataToExport = selectedIds.length > 0
+      ? apiTickets.filter(t => selectedIds.includes(t.id))
+      : tickets;
+
+    if (!dataToExport.length) return;
+    const fields = selectedFields.length ? selectedFields : Array.from(new Set(dataToExport.flatMap(t => Object.keys(t || {}))));
     const csvRows = [
       fields.join(","),
-      ...tickets.map(row =>
+      ...dataToExport.map(row =>
         fields.map(field => JSON.stringify(row[field] ?? "")).join(",")
       ),
     ];
@@ -367,12 +448,16 @@ function Index() {
 
   // Export PDF with buyer page styling (Name, Booking Date, Ticket N., Cost, Paid, Remained)
   const exportTicketsPDF = () => {
-    if (!tickets || !tickets.length) return;
+    const dataToExport = selectedIds.length > 0
+      ? apiTickets.filter(t => selectedIds.includes(t.id))
+      : tickets;
+
+    if (!dataToExport || !dataToExport.length) return;
 
     // Compute totals
     let totalCost = 0;
     let totalPaid = 0;
-    tickets.forEach(t => {
+    dataToExport.forEach(t => {
       const costN = parseFloat(String(t.agentCost || '0').replace(/[^\d.-]/g, '')) || 0;
       const paidN = parseFloat(String(t.receivingAmountT || '0').replace(/[^\d.-]/g, '')) || 0;
       totalCost += costN;
@@ -413,16 +498,16 @@ function Index() {
     row += 2;
 
     // Table
-    const headers = [["Name", "Booking Date", "PNR", "Ticket N.", "Agent Cost", "Fully Paid"]];
-    const body = tickets.map(t => {
-      console.log(t);
+    const headers = [["Name", "Payer", "Booking Date", "PNR", "Ticket N.", "Agent Cost", "Fully Paid"]];
+    const body = dataToExport.map(t => {
       const costStr = t.receivingAmountT || '';
-      const paidStr = t.agent !== '' ? t.agentCost : t.paidAmount;
+      const paidStr = t.agentCost || '';
       const costN = parseFloat(String(costStr).replace(/[^\d.-]/g, '')) || 0;
       const paidN = parseFloat(String(paidStr).replace(/[^\d.-]/g, '')) || 0;
       const remained = costN - paidN;
       return [
         t.name || '',
+        t.payer || '',
         t.bookedOn || '',
         t.bookingCode || '',
         t.ticketNumber || '',
@@ -520,7 +605,7 @@ function Index() {
                 input={<OutlinedInput label="Fields" />}
                 renderValue={selected => selected.includes("all") ? "All" : selected.join(", ")}
               >
-                {["all", "name", "agent", "bookingCode", "ticketNumber", "iata", "phone", "methods"].map(field => (
+                {["all", "name", "agent", "bookingCode", "ticketNumber", "iata", "phone", "methods", 'cardNumber'].map(field => (
                   <MenuItem key={field} value={field}>
                     <Checkbox checked={searchFields.indexOf(field) > -1} />
                     <ListItemText primary={{
@@ -531,7 +616,8 @@ function Index() {
                       ticketNumber: "Ticket",
                       iata: "Issued By",
                       phone: "Phone",
-                      methods: "Payment Method"
+                      methods: "Payment Method",
+                      cardNumber: "Card Number",
                     }[field] || field} />
                   </MenuItem>
                 ))}
@@ -611,13 +697,27 @@ function Index() {
       {/* Totals Summary */}
       <Paper elevation={1} style={{ margin: "10px 0 20px 0", padding: "16px", backgroundColor: "#f5f5f5", display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
         <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Typography variant="body1" sx={{ fontWeight: 'bold', border: '1px solid #bdbdbd', padding: '2px 10px', borderRadius: '16px', background: '#e0e0e0' }}>Tickets: {tickets.length}</Typography>
+          <Typography
+            variant="body1"
+            sx={{ fontWeight: 'bold', border: '1px solid #bdbdbd', padding: '2px 10px', borderRadius: '16px', background: '#e0e0e0', userSelect: 'none' }}
+            onDoubleClick={downloadBackup}
+          >
+            Tickets: {tickets.length}
+          </Typography>
           <Typography variant="body2">Profit: {totals[0]}</Typography>
           <Typography variant="body2">Cost: {totals[1]}</Typography>
+          <Typography variant="body2">Cust. Cost: {totals[4]}</Typography>
           <Typography variant="body2">Received: {totals[2]}</Typography>
           <Typography variant="body2">Agent Cost: {totals[3]}</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {selectedIds.length > 0 && (
+            <Tooltip title="Download Selected Individual Receipts">
+              <Button variant="contained" color="error" size="small" onClick={downloadSelectedTickets} startIcon={<PictureAsPdfIcon />}>
+                Export ({selectedIds.length})
+              </Button>
+            </Tooltip>
+          )}
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Sort By</InputLabel>
             <Select
@@ -690,16 +790,18 @@ function Index() {
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', height: '100%', overflow: 'hidden' }}>
               <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+                <Checkbox size="small" checked={selectedIds.includes(ticket.id)} onChange={() => toggleSelectTicket(ticket.id)} />
                 <Tooltip title={ticket.name}><Chip label={ticket.name.length > 25 ? ticket.name.slice(0, 25) + '…' : ticket.name} color="primary" variant="outlined" sx={{ width: 150, overflow: 'hidden', textOverflow: 'ellipsis' }} /></Tooltip>
                 <Tooltip title={ticket.bookingCode}><Chip label={ticket.bookingCode.length > 25 ? ticket.bookingCode.slice(0, 25) + '…' : ticket.bookingCode} color="secondary" variant="outlined" sx={{ width: 80, overflow: 'hidden', textOverflow: 'ellipsis' }} /></Tooltip>
                 <Typography sx={{ fontWeight: 500, width: 150, minWidth: 150, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticket.ticketNumber}</Typography>
-                <Tooltip title={ticket.iata}><Chip label={ticket.iata.length > 25 ? ticket.iata.slice(0, 25) + '…' : ticket.iata} color="tertiary" variant="outlined" sx={{ width: 80, overflow: 'hidden', textOverflow: 'ellipsis' }} /></Tooltip>
+                <Tooltip title={ticket.iata}><Chip label={(ticket?.iata || []).length > 25 ? ticket.iata.slice(0, 25) + '…' : ticket.iata} color="tertiary" variant="outlined" sx={{ width: 80, overflow: 'hidden', textOverflow: 'ellipsis' }} /></Tooltip>
                 <Typography
                   sx={{width: 80, minWIdth: 80, maxWidth: 80, textAllign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                   color={Number(ticket.profit.replace(/[^\d.-]/g, '')) < 0 ? 'error.main' : 'success.main'}>
                   {ticket.profit}
                 </Typography>
                 <Typography sx={{ width: 80, minWidth: 80, maxWidth: 80, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticket.paidAmount}</Typography>
+                <Typography sx={{ width: 80, minWidth: 80, maxWidth: 80, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticket.customerCost}</Typography>
                 <Typography sx={{ width: 80, minWidth: 80, maxWidth: 80, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticket.receivingAmountT}</Typography>
                 <Typography sx={{ width: 100, minWidth: 100, maxWidth: 100, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticket.bookedOn}</Typography>
                 <Typography variant='body2' sx={{ width: 80, minWidth: 80, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ticket.methods}</Typography>
@@ -747,10 +849,12 @@ function Index() {
           {ticket && (
             <Table><TableBody>
               <TableRow><TableCell>Passenger:</TableCell><TableCell>{ticket.name}</TableCell></TableRow>
+              <TableRow><TableCell>Payer:</TableCell><TableCell>{ticket.payer}</TableCell></TableRow>
               <TableRow><TableCell>Agent:</TableCell><TableCell>{ticket.agent}</TableCell></TableRow>
               <TableRow><TableCell>PNR:</TableCell><TableCell>{ticket.bookingCode}</TableCell></TableRow>
               <TableRow><TableCell>Ticket:</TableCell><TableCell>{ticket.ticketNumber}</TableCell></TableRow>
               <TableRow><TableCell>Cost:</TableCell><TableCell>{ticket.paidAmount}</TableCell></TableRow>
+              <TableRow><TableCell>Customer Cost:</TableCell><TableCell>{ticket.customerCost}</TableCell></TableRow>
               <TableRow><TableCell>Receiving Amount 1:</TableCell><TableCell>{ticket.receivingAmount1}</TableCell></TableRow>
               <TableRow><TableCell>Receiving Date 1:</TableCell><TableCell>{ticket.receivingAmount1Date}</TableCell></TableRow>
               <TableRow><TableCell>Payment Method:</TableCell><TableCell>{ticket.paymentMethod}</TableCell></TableRow>

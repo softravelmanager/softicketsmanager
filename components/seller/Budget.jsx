@@ -11,8 +11,12 @@ import { Spinner } from "components";
 export { Budget };
 
 function Budget(props) {
-  const refunds = props.refunds;
-  const { totalRefund, totalRefundUsed, totalRemained } = props.totals;
+  const refunds = props.refunds || [];
+  const { totalRefund = 0, totalRefundUsed = 0, totalRemained = 0 } =
+    props.totals || {};
+  const [supplierState, setSupplierState] = useState("");
+  const supplier = props.supplier || supplierState;
+  const setSupplier = props.setSupplier || setSupplierState;
   const [tickets, setTickets] = useState(null);
   const [totals, setTotals] = useState({
     totalCost: 0,
@@ -78,15 +82,21 @@ function Budget(props) {
 
   useEffect(() => {
     document.getElementById("complete").setAttribute("disabled", "disabled");
+    if (!supplier) {
+      setTickets(null);
+      setTotals({ totalCost: 0, totalPaidB2B: 0, totalRemainedB2B: 0 });
+      return;
+    }
+
     getTickets().finally((res) => {
       setTimeout(() => {
         disableEnableInputsOnDeltaZeroOrBudgetFieldsNotSet("d");
       }, 1000);
     });
-  }, []);
+  }, [supplier]);
 
   async function getTickets() {
-    const res = await ticketsService.getTicketsForSupply();
+    const res = await ticketsService.getTicketsForSupply({ supplier });
     let totalCost = 0;
     let totalPaidB2B = 0;
     let totalRemainedB2B = 0;
@@ -162,7 +172,7 @@ function Budget(props) {
             refundAmountTotalOperation: refundTot.toFixed(2),
             ticketId: e.id,
             transferDate: formatDate(date, "DB"),
-            operation: "Paid to B2B",
+            operation: `Paid to ${supplier || "B2B"}`,
             ticketRefundUsed: "",
             suppliedTicket: e.paid,
           };
@@ -337,8 +347,8 @@ function Budget(props) {
   return (
     <>
       <form id="add-form" onSubmit={(e) => onAdd(e)}>
-        <div className="row">
-          <div className="col-md-2">
+        <div className="row g-3 mb-3">
+          <div className="col-md-3">
             <label className="form-label">
               Date: <span className="text-danger">*</span>
             </label>
@@ -349,7 +359,24 @@ function Budget(props) {
               className="form-control"
             />
           </div>
-          <div className="col-md-2">
+          <div className="col-md-3">
+            <label className="form-label">
+              Supplier: <span className="text-danger">*</span>
+            </label>
+            <div className="mt-1">
+              <select
+                id="supplier"
+                className="form-select w-100"
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+              >
+                <option value="">Select supplier</option>
+                <option value="B2B">B2B</option>
+                <option value="SOF">SOF</option>
+              </select>
+            </div>
+          </div>
+          <div className="col-md-3">
             <label className="form-label">
               Bonifico: <span className="text-danger">*</span>
             </label>
@@ -364,7 +391,7 @@ function Budget(props) {
               className="form-control"
             />
           </div>
-          <div className="col-md-2">
+          <div className="col-md-3">
             <label className="form-label">Refund:</label>
             <input
               name="refund"
@@ -375,30 +402,32 @@ function Budget(props) {
               className="form-control"
             />
           </div>
-          <div className="col-md-2">
-            <div className="text-center">Total - Remained</div>
-            <div className="text-center mt-3">
-              € {total} - € {delta}
-            </div>
-          </div>
-          <div className="col-md-2">
-            <br />
-            <button type="submit" id="add" className="btn btn-primary me-2">
+        </div>
+        <div className="row g-3 mb-3">
+          <div className="col-md-6 d-grid">
+            <button type="submit" id="add" className="btn btn-primary">
               Start Transferring
             </button>
           </div>
-          <div className="col-md-2">
-            <br />
+          <div className="col-md-6 d-grid">
             <button
               onClick={() => {
                 ask();
               }}
               type="button"
               id="complete"
-              className="btn btn-success me-2"
+              className="btn btn-success"
             >
               Complete Transfer
             </button>
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-12 text-center">
+            <div className="text-center">Total - Remained</div>
+            <div className="text-center mt-3">
+              € {total} - € {delta}
+            </div>
           </div>
         </div>
       </form>

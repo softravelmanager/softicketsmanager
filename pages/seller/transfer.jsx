@@ -2,17 +2,28 @@ import { Layout } from "components/tickets";
 import { Budget } from "../../components/seller/Budget";
 import { useEffect, useState } from "react";
 import { ticketsService } from "../../services";
-import { Spinner } from "../../components";
 
 export default Add;
 
 function Add() {
-  useEffect(() => {
-    getRefundsForSupply();
-  }, []);
+  const [supplier, setSupplier] = useState("");
+  const [refunds, setRefunds] = useState([]);
+  const [totals, setTotals] = useState({});
 
-  function getRefundsForSupply() {
-    ticketsService.getRefundsForSupply({}).then((x) => {
+  useEffect(() => {
+    if (!supplier) {
+      setRefunds([]);
+      setTotals({});
+      return;
+    }
+
+    setRefunds([]);
+    setTotals({});
+    getRefundsForSupply(supplier);
+  }, [supplier]);
+
+  function getRefundsForSupply(supplier) {
+    ticketsService.getRefundsForSupply({ supplier }).then((x) => {
       let totalRefund = 0;
       let totalRefundUsed = 0;
       let totalRemained = 0;
@@ -32,11 +43,14 @@ function Add() {
     });
   }
 
-  const [refunds, setRefunds] = useState(null);
-  const [totals, setTotals] = useState({});
   return (
     <Layout>
-      {refunds ? <Budget refunds={refunds} totals={totals} /> : <Spinner />}
+      <Budget
+        supplier={supplier}
+        setSupplier={setSupplier}
+        refunds={refunds}
+        totals={totals}
+      />
     </Layout>
   );
 }

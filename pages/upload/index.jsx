@@ -23,7 +23,7 @@ function Index() {
   const [textContent, setTextContent] = useState('');
   const [processedTickets, setProcessedTickets] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const fileUploadTypes = ['amadeus', 'travelport'];
+  const fileUploadTypes = ['amadeus', 'travelport', 'emirates'];
   const months = [
     "JAN",
     "FEB",
@@ -42,11 +42,23 @@ function Index() {
   const handleFileChange = useCallback((e) => {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length > 0) {
-      const filteredFiles = selectedFiles.filter(file => {
-        const fileNameParts = file.name.split(".");
-        const extension = fileNameParts[fileNameParts.length - 1];
-        return (fileNameParts.length > 1 && extension.includes("M")) || months.includes(extension);
-      });
+      let filteredFiles = selectedFiles;
+      
+      if (uploadType === 'emirates') {
+        // For Emirates, accept only XML files
+        filteredFiles = selectedFiles.filter(file => {
+          const fileNameParts = file.name.split(".");
+          const extension = fileNameParts[fileNameParts.length - 1];
+          return extension.toLowerCase() === 'xml';
+        });
+      } else {
+        // For other types, keep original Amadeus logic
+        filteredFiles = selectedFiles.filter(file => {
+          const fileNameParts = file.name.split(".");
+          const extension = fileNameParts[fileNameParts.length - 1];
+          return (fileNameParts.length > 1 && extension.includes("M")) || months.includes(extension);
+        });
+      }
 
       setFiles(filteredFiles);
 
@@ -66,7 +78,7 @@ function Index() {
       setFiles([]);
       setContent([]);
     }
-  }, [months]);
+  }, [months, uploadType]);
 
   const deleteItem = useCallback((index) => {
     setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
@@ -108,6 +120,9 @@ function Index() {
         break;
       case 'travelport':
         parsePromise = ticketsService.uploadTravelPort(contentToUpload);
+        break;
+      case 'emirates':
+        parsePromise = ticketsService.uploadEmirates(contentToUpload);
         break;
       case 'amadeus':
       default:
@@ -158,6 +173,7 @@ function Index() {
   const handleTicketChange = (ticketIndex, fieldKey, newValue) => {
     const numericFields = [
       'agentCost',
+      'customerCost',
       'paidAmount',
       'receivingAmount1',
       'receivingAmount2',
@@ -195,13 +211,23 @@ function Index() {
                 aria-label="upload-type"
                 name="upload-type-group"
                 value={uploadType}
-                onChange={(e) => setUploadType(e.target.value)}
+                onChange={(e) => {
+                  setUploadType(e.target.value);
+                  // Clear previous data when switching upload types
+                  setFiles([]);
+                  setContent([]);
+                  setTextContent('');
+                  setProcessedTickets([]);
+                  const input = document.getElementById("filesInput");
+                  if(input) input.value = "";
+                }}
               >
-                <FormControlLabel value="amadeus" control={<Radio />} label="Amadeus" />                
+                <FormControlLabel value="amadeus" control={<Radio />} label="Amadeus" />
                 <FormControlLabel value="travelport" control={<Radio />} label="Travel Port" />
                 <FormControlLabel value="airarabia" control={<Radio />} label="Air Arabia" />
                 <FormControlLabel value="wizzair" control={<Radio />} label="Wizz Air" />
                 <FormControlLabel value="flixbus" control={<Radio />} label="Flixbus" />
+                <FormControlLabel value="emirates" control={<Radio />} label="Emirates" />
               </RadioGroup>
             </FormControl>
             {fileUploadTypes.includes(uploadType) && (
@@ -213,7 +239,7 @@ function Index() {
                       className="file-upload-input"
                       type="file"
                       name="files[]"
-                      accept=".M*"
+                      accept={uploadType === 'emirates' ? '.xml' : '.M*'}
                       multiple
                       onChange={handleFileChange}
                     />
@@ -286,7 +312,7 @@ function Index() {
                               if (!field) return <Box key={subIndex} sx={{ flex: 1 }} />; // Empty box for alignment if odd number of fields
                               const [key, value] = field;
                               const isNumericField = [
-                                'agentCost', 'paidAmount', 'receivingAmount1', 'receivingAmount2',
+                                'agentCost', 'paidAmount', 'customerCost', 'receivingAmount1', 'receivingAmount2',
                                 'receivingAmount3', 'refund', 'supplied', 'returned', 'paidByAgent'
                               ].includes(key);
 

@@ -83,13 +83,15 @@ async function anonymizeTickets(db, faker) {
         filter: { _id: ticket._id },
         update: {
           $set: {
-            name: faker.person.fullName().toUpperCase(),
+            name: faker.person.fullName(),
+            payer: faker.person.fullName(),
             bookingCode: faker.string.alphanumeric(6).toUpperCase(),
             ticketNumber: faker.string.numeric(13),
             phone: faker.phone.number(),
             cardNumber: `**** **** **** ${faker.string.numeric(4)}`,
             paymentMethod: faker.finance.transactionType(),
             paidAmount: obfuscateAmount(ticket.paidAmount),
+            customerCost: obfuscateAmount(ticket.customerCost),
             receivingAmount1: obfuscateAmount(ticket.receivingAmount1),
             receivingAmount1Date: ticket.receivingAmount1Date ? fakeDate() : '',
             receivingAmount2: obfuscateAmount(ticket.receivingAmount2),
