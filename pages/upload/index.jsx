@@ -118,6 +118,9 @@ function Index() {
       case 'flixbus':
         parsePromise = ticketsService.uploadFlixbus(contentToUpload);
         break;
+      case 'turkishair':
+        parsePromise = ticketsService.uploadTurkishAir(contentToUpload);
+        break;
       case 'travelport':
         parsePromise = ticketsService.uploadTravelPort(contentToUpload);
         break;
@@ -227,6 +230,7 @@ function Index() {
                 <FormControlLabel value="airarabia" control={<Radio />} label="Air Arabia" />
                 <FormControlLabel value="wizzair" control={<Radio />} label="Wizz Air" />
                 <FormControlLabel value="flixbus" control={<Radio />} label="Flixbus" />
+                <FormControlLabel value="turkishair" control={<Radio />} label="Turkish Air" />
                 <FormControlLabel value="emirates" control={<Radio />} label="Emirates" />
               </RadioGroup>
             </FormControl>

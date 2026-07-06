@@ -37,6 +37,7 @@ export const ticketsService = {
   uploadAirArabia,
   uploadWizzAir,
   uploadFlixbus,
+  uploadTurkishAir,
   uploadEmirates,
   uploadTravelPort,
 };
@@ -1097,6 +1098,171 @@ async function uploadFlixbus(files) {
     }
 
     return allTickets;
+}
+
+function normalizeTurkishPassengerName(value) {
+  if (!value) return "";
+
+  const cleanedValue = value.replace(/\s+/g, " ").trim().toUpperCase();
+  const titlePattern = /\b(MR|MRS|MS|MISS|CHD|CHILD)\b/i;
+  const titleMatch = cleanedValue.match(titlePattern);
+
+  if (titleMatch) {
+    const parts = cleanedValue.split(titleMatch[0]);
+    const firstName = parts[0].trim();
+    const surname = parts[1] ? parts[1].trim() : "";
+    if (firstName && surname) {
+      return `${surname}/${firstName}`;
+    }
+  }
+
+  const nameParts = cleanedValue.split(" ").filter(Boolean);
+  if (nameParts.length > 1) {
+    const surname = nameParts.pop();
+    const firstName = nameParts.join(" ");
+    return `${surname}/${firstName}`;
+  }
+
+  return cleanedValue;
+}
+
+function formatTurkishAirDate(value) {
+  if (!value) return "";
+
+  const trimmedValue = String(value).trim();
+  if (/^\d{8}$/.test(trimmedValue)) {
+    return `${trimmedValue.slice(6, 8)}/${trimmedValue.slice(4, 6)}/${trimmedValue.slice(0, 4)}`;
+  }
+
+  if (/^\d{2}\.\d{2}\.\d{4}$/.test(trimmedValue)) {
+    const [day, month, year] = trimmedValue.split('.');
+    return `${day}/${month}/${year}`;
+  }
+
+  return trimmedValue;
+}
+
+async function uploadTurkishAir(files) {
+  const users = await fetchWrapper.get(usersUrl);
+  let agl = {};
+  let admin = "";
+  let agency = "";
+  users.forEach((userT) => {
+    let nameT = `${userT.firstName} ${userT.lastName}`;
+    if (userT.level === "admin") admin = userT.id;
+    if (nameT.toLowerCase().includes("agency")) agency = userT.id;
+    agl[userT.code] = userT.id;
+  });
+
+  const allTickets = [];
+
+  for (const fileContent of files) {
+    const ticketBlocks = [];
+    const ticketNumberMatches = [...fileContent.matchAll(/^TICKET NO\s+(\S+)/gm)];
+
+    if (ticketNumberMatches.length > 0) {
+      ticketNumberMatches.forEach((match, index) => {
+        const start = match.index;
+        const end = ticketNumberMatches[index + 1]?.index ?? fileContent.length;
+        const block = fileContent.slice(start, end).trim();
+        if (block) {
+          ticketBlocks.push({ ticketNumber: match[1], content: block });
+        }
+      });
+    } else {
+      ticketBlocks.push({ ticketNumber: "", content: fileContent });
+    }
+
+    ticketBlocks.forEach((ticketBlock) => {
+      const block = ticketBlock.content;
+      const ticketNumber = ticketBlock.ticketNumber;
+      const issueDateMatch = block.match(/ISSUE DATE\s+(\d{2}\.\d{2}\.\d{4})/i);
+      const bookedOn = issueDateMatch
+        ? formatDate(new Date(issueDateMatch[1].split('.').reverse().join('-')))
+        : formatDate(new Date());
+
+      const bookingCodeMatch = block.match(/PNR\s+([A-Z0-9]+)/i);
+      const bookingCode = bookingCodeMatch ? bookingCodeMatch[1] : "";
+
+      const endorsementMatch = block.match(/Endorsment\s+(.+)/i);
+      const validatorCodeMatch = block.match(/VALIDATOR CODE\s+(\d+)/i);
+      const tourCodeMatch = block.match(/TOUR CODE\s+([A-Z0-9]+)/i);
+      const totalFareMatch = block.match(/TOTAL FARE\s+([\d.,]+)\s+EUR/i);
+      const paymentTypeMatch = block.match(/PAYMENT TYPE\s+([A-Z]+)/i);
+      const cardNumberMatch = block.match(/CARD NUMBER\s+([A-Z0-9]+)/i);
+      const orderIdMatch = block.match(/ORDER ID\s+([A-Z0-9]+)/i);
+      const passengerNameMatch = block.match(/PASSENGER NAME\s*\/\s*SURNAME\s+(.+)/i);
+      const passengerName = normalizeTurkishPassengerName(passengerNameMatch ? passengerNameMatch[1] : "");
+
+      const segmentMatches = [...block.matchAll(/^\s*(?:\d+)\s+([A-Z]{3})\s*\/\s*([A-Z]{3})\s+([A-Z]{2})\s+(\d{3,4})\s+([A-Z0-9])\s+(\d{8})\s+(\d{4})\s+([A-Z]{2})/gm)];
+      const segments = segmentMatches.map((match) => ({
+        origin: match[1],
+        destination: match[2],
+        carrier: match[3],
+        flightNumber: match[4],
+        travelClass: match[5],
+        flightDate: match[6],
+        flightTime: match[7],
+        status: match[8],
+      }));
+
+      const firstSegment = segments[0];
+      const lastSegment = segments[segments.length - 1];
+      const travel1 = firstSegment ? `${firstSegment.origin} - ${firstSegment.destination}` : "";
+      const travel2 = lastSegment && segments.length > 1 ? `${lastSegment.origin} - ${lastSegment.destination}` : "";
+      const dates = segments.length > 0
+        ? `${formatTurkishAirDate(firstSegment.flightDate)}${segments.length > 1 ? ` - ${formatTurkishAirDate(lastSegment.flightDate)}` : ""}`
+        : "";
+
+      const descParts = [];
+      if (endorsementMatch) descParts.push(`Endorsement: ${endorsementMatch[1].trim()}`);
+      if (tourCodeMatch) descParts.push(`Tour Code: ${tourCodeMatch[1].trim()}`);
+      if (validatorCodeMatch) descParts.push(`Validator: ${validatorCodeMatch[1].trim()}`);
+      if (orderIdMatch) descParts.push(`Order ID: ${orderIdMatch[1].trim()}`);
+
+      const tkt = {
+        name: passengerName,
+        payer: "",
+        bookingCode: bookingCode,
+        agent: "",
+        agentId: agency || admin || "123456789012345678901234",
+        iata: "TURKISH AIRLINES",
+        office: validatorCodeMatch ? validatorCodeMatch[1] : "",
+        agentCost: 0,
+        customerCost: 0,
+        ticketNumber: ticketNumber || ticketBlock.ticketNumber,
+        paymentMethod: paymentTypeMatch ? paymentTypeMatch[1] : "",
+        paidAmount: totalFareMatch ? parseFloat(totalFareMatch[1].replace(/,/g, ".")) : 0,
+        receivingAmount1: 0,
+        receivingAmount1Date: "",
+        receivingAmount2Date: "",
+        receivingAmount2Method: "",
+        receivingAmount3Date: "",
+        receivingAmount3Method: "",
+        receivingAmount2: 0,
+        receivingAmount3: 0,
+        cardNumber: cardNumberMatch ? cardNumberMatch[1] : "",
+        isVoid: false,
+        bookedOn: bookedOn,
+        travel1: travel1,
+        travel2: travel2,
+        dates: dates,
+        phone: "",
+        flight: firstSegment ? `${firstSegment.carrier} ${firstSegment.flightNumber}` : "TURKISH AIRLINES",
+        refund: "",
+        refundDate: "",
+        desc: descParts.join(" | "),
+        supplied: 0,
+        returned: 0,
+        returnedDate: "",
+        paidByAgent: 0,
+      };
+
+      allTickets.push(tkt);
+    });
+  }
+
+  return allTickets;
 }
 
 async function uploadEmirates(files) {
