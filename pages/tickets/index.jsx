@@ -181,7 +181,7 @@ function Index() {
   const drawTicketReceipt = (doc, tickets) => {
     const ticketList = Array.isArray(tickets) ? tickets : [tickets];
     const firstTicket = ticketList[0];
-    const imgData = "logo.png";
+    const imgData = "logo.PNG";
     const imgData1 = "iata2.jpg";
 
     // 1. Logo (Centered as per image)
