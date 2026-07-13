@@ -15,7 +15,7 @@ export function cleanFlight(ticket) {
     .trim();
   let flight2 = flight.slice(0, 2);
   let flight3 = flight2 === "A " ? flight.slice(2).trim() : flight;
-  return flight3;
+  return flight3.toUpperCase();
 }
 
 export function formatDate(date, format = "DB") {
