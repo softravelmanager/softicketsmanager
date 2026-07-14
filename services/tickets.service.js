@@ -112,30 +112,30 @@ async function getAll(filters, flights = []) {
     }
     return {
       ...t,
-      profit: "Eur "+ profit,
+      profit: "EUR "+ profit,
       bookedOn: bkd,
       receivingAmount1Date: ra1d,
       receivingAmount2Date: ra2d,
       receivingAmount3Date: ra3d,
       idP: i + 1,
-      receivingAmountT: "Eur "+ tra.toFixed(2),
-      paidAmount: "Eur "+ t.paidAmount,
-      customerCost: t.customerCost !== undefined ? "Eur "+ parseFloat(t.customerCost || 0).toFixed(2) : "",
+      receivingAmountT: "EUR "+ tra.toFixed(2),
+      paidAmount: "EUR "+ t.paidAmount,
+      customerCost: t.customerCost !== undefined ? "EUR "+ parseFloat(t.customerCost || 0).toFixed(2) : "",
       agent,
-      agentCost: t.agentCost && agent ? "Eur "+ t.agentCost : "",
+      agentCost: t.agentCost && agent ? "EUR "+ t.agentCost : "",
       methods: methods,
-      refund: t.refund ? "Eur "+ t.refund : t.refund,
-      refundUsed: t.refundUsed ? "Eur "+ t.refundUsed : t.refundUsed,
+      refund: t.refund ? "EUR "+ t.refund : t.refund,
+      refundUsed: t.refundUsed ? "EUR "+ t.refundUsed : t.refundUsed,
       refundDate: t.refundDate ? formatDate(t.refundDate, "IT") : t.refundDate,
-      returned: t.returned ? "Eur "+ t.returned : t.returned,
+      returned: t.returned ? "EUR "+ t.returned : t.returned,
       returnedDate: t.returnedDate
         ? formatDate(t.returnedDate, "IT")
         : t.returnedDate,
-      supplied: t.supplied ? "Eur "+ t.supplied : t.supplied,
-      paidByAgent: t.paidByAgent ? "Eur "+ t.paidByAgent : t.paidByAgent,
-      penality: penality !== "" ? "Eur "+ parseFloat(penality).toFixed(2) : "",
+      supplied: t.supplied ? "EUR "+ t.supplied : t.supplied,
+      paidByAgent: t.paidByAgent ? "EUR "+ t.paidByAgent : t.paidByAgent,
+      penality: penality !== "" ? "EUR "+ parseFloat(penality).toFixed(2) : "",
       amountsCompleted: amountsCompleted,
-      daSaldare: "Eur "+ daSaldare.toFixed(2), // Format daSaldare here
+      daSaldare: "EUR "+ daSaldare.toFixed(2), // Format daSaldare here
     };
   });
   return tickets;
