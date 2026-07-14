@@ -431,9 +431,9 @@ function Index() {
     if (!dataToExport.length) return;
     const fields = selectedFields.length ? selectedFields : Array.from(new Set(dataToExport.flatMap(t => Object.keys(t || {}))));
     const csvRows = [
-      fields.join(","),
+      fields.join(";"),
       ...dataToExport.map(row =>
-        fields.map(field => JSON.stringify(row[field] ?? "")).join(",")
+        fields.map(field => JSON.stringify(row[field] ?? "")).join(";")
       ),
     ];
     const csvData = csvRows.join("\n");
