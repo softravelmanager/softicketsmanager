@@ -4,6 +4,7 @@ import Router from "next/router";
 import { formatDate, ticketsService } from "../../services";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
+import * as XLSX from 'xlsx';
 import {
   Grid, Paper, Typography, Box, Stack, IconButton, Tooltip, Chip, Button, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableBody, TableRow, TableCell,
   FormControl, InputLabel, Select, MenuItem, OutlinedInput, Checkbox, ListItemText, FormControlLabel, Collapse
@@ -422,7 +423,7 @@ function Index() {
     ]);
   };
 
-  // Export CSV using selected fields (if any) or all fields by default
+  // Export Excel using selected fields (if any) or all fields by default
   const exportCSV = () => {
     const dataToExport = selectedIds.length > 0
       ? apiTickets.filter(t => selectedIds.includes(t.id))
@@ -430,20 +431,22 @@ function Index() {
 
     if (!dataToExport.length) return;
     const fields = selectedFields.length ? selectedFields : Array.from(new Set(dataToExport.flatMap(t => Object.keys(t || {}))));
-    const csvRows = [
-      fields.join(";"),
+    
+    // Create worksheet data
+    const worksheetData = [
+      fields,
       ...dataToExport.map(row =>
-        fields.map(field => JSON.stringify(row[field] ?? "")).join(";")
+        fields.map(field => row[field] ?? "")
       ),
     ];
-    const csvData = csvRows.join("\n");
-    const blob = new Blob([csvData], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tickets_export.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    
+    // Create workbook and worksheet
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
+    
+    // Write Excel file
+    XLSX.writeFile(workbook, 'tickets_export.xlsx');
   };
 
   // Export PDF with buyer page styling (Name, Booking Date, Ticket N., Cost, Paid, Remained)

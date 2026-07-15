@@ -172,9 +172,9 @@ export default function RefundsPage() {
     if (!refunds.length) return;
     const fields = ["name","supplied","refund","refundDate","refundUsed","penality","returned","returnedDate","bookingCode","ticketNumber","bookedOn"];
     const csvRows = [
-      fields.join(","),
+      fields.join(";"),
       ...refunds.map(row =>
-        fields.map(field => JSON.stringify(row[field] ?? "")).join(",")
+        fields.map(field => JSON.stringify(row[field] ?? "")).join(";")
       ),
     ];
     const csvData = csvRows.join("\n");

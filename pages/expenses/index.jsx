@@ -104,9 +104,9 @@ export default function ExpensesPage() {
     if (!filteredExpenses.length) return;
     const fields = ["type", "title", "paymentMethod", "amount", "paymentDate", "desc", "category", "subcategory", "status"];
     const csvRows = [
-      fields.join(","),
+      fields.join(";"),
       ...filteredExpenses.map(row =>
-        fields.map(field => JSON.stringify(row[field] ?? "")).join(",")
+        fields.map(field => JSON.stringify(row[field] ?? "")).join(";")
       ),
     ];
     const csvData = csvRows.join("\n");
@@ -121,7 +121,7 @@ export default function ExpensesPage() {
 
   const downloadTemplate = () => {
     const fields = ["title", "desc", "category", "subcategory", "type", "paymentMethod", "amount", "paymentDate", "status"];
-    const csvHeader = fields.join(",");
+    const csvHeader = fields.join(";");
     const blob = new Blob([csvHeader], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
