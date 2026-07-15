@@ -766,135 +766,135 @@ async function uploadAirArabia(files) {
   const allTickets = [];
 
   for (const fileContent of files) {
-    const lines = fileContent.split('\n').map(line => line.trim());
-
     // --- Extract Common Information ---
-    const pnrMatch = fileContent.match(/RESERVATION NUMBER \(PNR\)\s*(\w+)/);
-    const bookingCode = pnrMatch ? pnrMatch[1] : '';
-
-    const bookingDateMatch = fileContent.match(/DATE OF BOOKING\s*(\d{2} \w{3} \d{4})/);
+    
+    // Extract booking date (e.g., "11 Jul 2026")
+    const bookingDateMatch = fileContent.match(/Booking Date\s+(\d{1,2}\s+\w{3}\s+\d{4})/);
     const bookedOn = bookingDateMatch ? formatDate(new Date(bookingDateMatch[1])) : formatDate(new Date());
 
-    const agentDetailsMatch = fileContent.match(/AGENT DETAILS\s*([\s\S]*?)\s*TRAVEL SEGMENTS/);
-    const agentCode = agentDetailsMatch ? (agentDetailsMatch[1].match(/\(([^)]+)\)/) || [])[1] : '';
-
-    const airlineLegendMatch = fileContent.match(/AIRLINE CODE LEGEND\s*3O\s+-\s+(Air Arabia Maroc)/);
-    const airlineName = airlineLegendMatch ? airlineLegendMatch[1].trim() : '';
-
-    const contactDetailsMatch = fileContent.match(/PASSENGER CONTACT DETAILS\s*([\s\S]*?)\s*AGENT DETAILS/);
-    const phoneMatch = contactDetailsMatch ? contactDetailsMatch[1].match(/(\d{2}-\d{3,}-\d{6,})/) : null;
-    const phone = phoneMatch ? phoneMatch[0].replace(/-/g, '') : '';
-
-    // --- Extract Travel Segments ---
-    const travelSegmentsMatch = fileContent.match(/TRAVEL SEGMENTS([\s\S]*?)LOCAL CALL CENTER/);
-    let travel1 = '', travel2 = '', dates = '', flight = '', allFlights = [];
-    if (travelSegmentsMatch) {
-        // Split the segment block by "Duration:" to isolate each flight leg
-        const segmentBlocks = travelSegmentsMatch[1].split(/Duration:/).filter(block => block.trim() !== '');
-        let segments = [];
-
-        for (const block of segmentBlocks) {
-            const flightNumMatch = block.match(/(\w{2}\d+)\s+\(Non-Stop\)/);
-            const originMatch = block.match(/\(Non-Stop\)\s+([\w\s]+?)\s+([\w, ]+\d{4})/);
-            const destinationMatch = block.match(/OK\s+([\w\s-]+?)\s+[\w, ]+\d{4}/);
-
-            if (flightNumMatch && originMatch && destinationMatch) {
-                allFlights.push(flightNumMatch[1]);
-                const departureDate = new Date(originMatch[2]);
-                const formattedDate = `${departureDate.getDate().toString().padStart(2, '0')}/${(departureDate.getMonth() + 1).toString().padStart(2, '0')}/${departureDate.getFullYear()}`;
-                segments.push({ origin: originMatch[1].trim(), destination: destinationMatch[1].trim(), date: formattedDate });
-            }
-        }
-
-        if (segments.length > 0) {
-            travel1 = `${segments[0].origin} - ${segments[0].destination}`;
-            dates = segments[0].date;
-        }
-        if (segments.length > 1) {
-            travel2 = `${segments[1].origin} - ${segments[1].destination}`;
-            dates = `${segments[0].date} - ${segments[1].date}`;
-        }
-        flight = airlineName || allFlights.join(' - ');
+    // Extract passenger name from greeting (e.g., "Hello Bahya El Sayed Ahmed,")
+    const passengerNameMatch = fileContent.match(/Hello\s+([\w\s]+?),/);
+    let passengerFullName = passengerNameMatch ? passengerNameMatch[1].trim() : '';
+    // Format as "LastName/FirstName"
+    let passengerName = '';
+    if (passengerFullName) {
+      const nameParts = passengerFullName.split(/\s+/);
+      const lastName = nameParts[nameParts.length - 1];
+      const firstName = nameParts.slice(0, -1).join(' ');
+      passengerName = `${lastName}/${firstName}`;
     }
 
-    // --- Extract E-Ticket and Payment Details for each passenger ---
-    const eTicketSectionMatch = fileContent.match(/E TICKET DETAILS([\s\S]*?)ANCILLARY DETAILS/);
-    const paymentSectionMatch = fileContent.match(/PAYMENT DETAILS([\s\S]*?)\*/);
+    // Extract Reservation Number (e.g., "7R90HJ")
+    const reservationMatch = fileContent.match(/Reservation Number\s+([\w]+)/);
+    const bookingCode = reservationMatch ? reservationMatch[1] : '';
 
-    if (eTicketSectionMatch) {
-        const ticketRows = eTicketSectionMatch[1].matchAll(/(MR|MRS|MISS|Child\.)\s+([\w\s]+?)\s+\w{3}\/\w{3}\s+\w+\s+([\d\/]+)/g);
+    // Extract PIN
+    const pinMatch = fileContent.match(/PIN\s+(\d+)/);
+    const pin = pinMatch ? pinMatch[1] : '';
 
-        for (const ticketMatch of ticketRows) {
-            const passengerTitle = ticketMatch[1].trim();
-            // ticketMatch[2] contains the name without the title.
-            const cleanedName = ticketMatch[2].trim().replace(/\s+/g, ' '); // Normalize spaces
-            const nameParts = cleanedName.split(' ').filter(part => part); // Split by space and remove empty parts
-            const surname = nameParts.pop() || ''; // Last element is the surname
-            const firstName = nameParts.join(' '); // The rest is the first name
-            const passengerName = `${surname}/${firstName}`;
-            let ticketNumber = ticketMatch[3].split('/')[0];
-            //if (ticketNumber.length === 13) {
-            ticketNumber = ticketNumber.slice(0, 3) + "-" + ticketNumber.slice(3);
-            //}
+    // Extract Travel Route (e.g., "Milan - Bergamo  to  Alexandria")
+    const routeMatch = fileContent.match(/Travel Itinerary\s+([\w\s-]+?)\s+to\s+([\w\s-]+?)\s+(?:Value|Ultimate)\s+Fare/);
+    let travel1 = '', travel2 = '';
+    if (routeMatch) {
+      const fromRoute = routeMatch[1].trim();
+      const toRoute = routeMatch[2].trim();
+      // Extract just the last city from the "from" route (e.g., "Milan - Bergamo" -> "Bergamo")
+      const fromCities = fromRoute.split('-').map(c => c.trim());
+      const fromCity = fromCities[fromCities.length - 1];
+      travel1 = `${fromCity} - ${toRoute}`;
+    }
 
-            // Find corresponding payment
-            let paidAmount = 0;
-            let paymentMethod = '';
-            let cardNumber = '';
-            // Reconstruct the name as it appears in the payment section for searching.
-            let searchName = `${passengerTitle} ${cleanedName}`;
-            searchName = searchName.replace('Child. ', '');
-            if (paymentSectionMatch) {
-                const paymentRegex = new RegExp(`${searchName.replace('.', '\\.')}[\\s\\S]*?CARD PAYMENT - (\\w+)\\s+(\\d+)[\\s\\S]*?(\\d+\\.\\d{2}) EUR`);
-                const paymentDetails = paymentSectionMatch[1].match(paymentRegex);
-                if (paymentDetails) {
-                    paymentMethod = paymentDetails[1]; // e.g., MASTER
-                    cardNumber = paymentDetails[2]; // e.g., 7915
-                    paidAmount = parseFloat(paymentDetails[3]); // e.g., 214.46
-                }
-            }
+    // Extract flight dates and convert to DD/MM/YYYY format
+    // Pattern: "BGY ... HBE Milan - Bergamo 19 Jul 2026   19:50"
+    const flightMatch = fileContent.match(/(\w{3})\s+.*?(\w{3})\s+[\w\s-]+\s+(\d{1,2})\s+(\w{3})\s+(\d{4})\s+(\d{1,2}:\d{2})/);
+    let dates = '';
+    if (flightMatch) {
+      const day = flightMatch[3].padStart(2, '0');
+      const monthStr = flightMatch[4].toLowerCase();
+      const monthMap = { 'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06', 'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12' };
+      const month = monthMap[monthStr] || '01';
+      const year = flightMatch[5];
+      dates = `${day}/${month}/${year}`;
+    }
 
-            const tkt = {
-                name: passengerName,
-                payer: "",
-                bookingCode: bookingCode,
-                agent: agl.hasOwnProperty(agentCode) ? agl[agentCode] : '',
-                agentId: agl.hasOwnProperty(agentCode)
-                    ? agl[agentCode]
-                    : agency || admin || "123456789012345678901234",
-                iata: 'AIR ARABIA MAROC',
-                office: '', // Not available in this format
-                agentCost: 0, // Not available in this format
-                customerCost: 0,
-                ticketNumber: ticketNumber,
-                paymentMethod: '',
-                paidAmount: paidAmount,
-                receivingAmount1: 0, // Default value
-                receivingAmount1Date: '',
-                receivingAmount2Date: '',
-                receivingAmount2Method: "",
-                receivingAmount3Date: '',
-                receivingAmount3Method: "",
-                receivingAmount2: 0,
-                receivingAmount3: 0,
-                cardNumber: cardNumber,
-                isVoid: false,
-                bookedOn: bookedOn,
-                travel1: travel1,
-                travel2: travel2,
-                dates: dates,
-                phone: phone,
-                flight: 'AIR ARABIA MAROC',
-                refund: "",
-                refundDate: "",
-                desc: "",
-                supplied: 0,
-                returned: 0,
-                returnedDate: "",
-                paidByAgent: 0,
-            };
-            allTickets.push(tkt);
-        }
+    // Extract phone number
+    let phone = '';
+    const phoneMatch = fileContent.match(/Contact Mobile\s+(\d+-\d+-\d+)/);
+    if (phoneMatch) {
+      phone = phoneMatch[1].replace(/-/g, '');
+    }
+
+    // Extract agent code from "Agent Name" line (e.g., "MAC22 (MAC)")
+    const agentDetailsMatch = fileContent.match(/Agent Name\s+([\w\s]+?)\s+(\w+)\s+\((\w+)\)/);
+    let agentCode = '';
+    if (agentDetailsMatch) {
+      agentCode = agentDetailsMatch[3]; // Extract the code from parentheses like (MAC)
+    }
+
+    // Extract payment details from "Summary of Charges" section
+    // Fare amount (e.g., "Fare MAD 2145.64")
+    const fareMatch = fileContent.match(/Fare\s+MAD\s+([\d.]+)/);
+    const fareAmount = fareMatch ? parseFloat(fareMatch[1]) : 0;
+
+    // Total Payment amount (e.g., "Total Payment MAD 3530.48")
+    const totalPaymentMatch = fileContent.match(/Total Payment\s+MAD\s+([\d.]+)/);
+    const paidAmount = totalPaymentMatch ? parseFloat(totalPaymentMatch[1]) : fareAmount;
+
+    // Extract payment method (e.g., "Credit Card- master" or "Credit Card- mastercard")
+    const paymentMethodMatch = fileContent.match(/Payment Method\s+([\w\s-]+)/);
+    let paymentMethod = '';
+    if (paymentMethodMatch) {
+      const methodStr = paymentMethodMatch[1].toLowerCase();
+      if (methodStr.includes('master')) {
+        paymentMethod = 'MASTER';
+      } else if (methodStr.includes('visa')) {
+        paymentMethod = 'VISA';
+      } else {
+        paymentMethod = paymentMethodMatch[1].trim();
+      }
+    }
+
+    if (passengerName && bookingCode) {
+      const tkt = {
+        name: passengerName,
+        payer: "",
+        bookingCode: bookingCode,
+        agent: agl.hasOwnProperty(agentCode) ? agl[agentCode] : '',
+        agentId: agl.hasOwnProperty(agentCode)
+          ? agl[agentCode]
+          : agency || admin || "123456789012345678901234",
+        iata: 'AIR ARABIA MAROC',
+        office: '',
+        agentCost: 0,
+        customerCost: 0,
+        ticketNumber: `${bookingCode}-${pin}`,
+        paymentMethod: paymentMethod,
+        paidAmount: paidAmount,
+        receivingAmount1: 0,
+        receivingAmount1Date: '',
+        receivingAmount2Date: '',
+        receivingAmount2Method: "",
+        receivingAmount3Date: '',
+        receivingAmount3Method: "",
+        receivingAmount2: 0,
+        receivingAmount3: 0,
+        cardNumber: '',
+        isVoid: false,
+        bookedOn: bookedOn,
+        travel1: travel1,
+        travel2: travel2,
+        dates: dates,
+        phone: phone,
+        flight: 'AIR ARABIA MAROC',
+        refund: "",
+        refundDate: "",
+        desc: "",
+        supplied: 0,
+        returned: 0,
+        returnedDate: "",
+        paidByAgent: 0,
+      };
+      allTickets.push(tkt);
     }
   }
 
