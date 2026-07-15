@@ -446,7 +446,8 @@ function Index() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
     
     // Write Excel file
-    XLSX.writeFile(workbook, 'tickets_export.xlsx');
+    const name = 'tickets_export_' + moment().format('YYYY-MM-DD') + '.xlsx';
+    XLSX.writeFile(workbook, name);
   };
 
   // Export PDF with buyer page styling (Name, Booking Date, Ticket N., Cost, Paid, Remained)
