@@ -1,5 +1,5 @@
 import { fetchWrapper } from "helpers";
-import { cleanFlight, formatDate } from "./index";
+import { cleanFlight, formatDate, agregateFlights } from "./index";
 
 const baseUrl = `/api/tickets`;
 const usersUrl = "/api/users";
@@ -54,7 +54,8 @@ async function getFlights() {
   let flights = [];
   response.map((r) => {
     let url = "";
-    let flight = cleanFlight(r);
+    let flightT = cleanFlight(r);
+    let flight = agregateFlights(flightT);
     if (airlinesN.includes(flight)) {
       url = airlinesI.filter((a) => a.name === flight)[0].url;
     }
@@ -305,7 +306,8 @@ async function getProfit(filters) {
       }
     }
 
-    let flight = cleanFlight(ticket);
+    let flightT = cleanFlight(ticket);
+    let flight = agregateFlights(flightT);
     if (!Object.keys(airlines).includes(flight)) {
       airlines[flight] = 1;
     } else {

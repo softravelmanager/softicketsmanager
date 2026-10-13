@@ -18,6 +18,14 @@ export function cleanFlight(ticket) {
   return flight3.toUpperCase();
 }
 
+export function agregateFlights(flight) {
+  if (flight.startsWith("TK ")) {
+    return 'TURKISH AIRLINES';
+  } else {
+    return flight;
+  }
+}
+
 export function formatDate(date, format = "DB") {
   let d;
   // If the date is already a Date object, use it directly.
